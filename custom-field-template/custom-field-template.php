@@ -1,11 +1,11 @@
 <?php
 /*
 Plugin Name: Custom Field Template
-Plugin URI: https://wpgogo.com/development/custom-field-template.html
+Plugin URI: https://www.wpcft.com/
 Description: This plugin adds the default custom fields on the Write Post/Page.
 Author: Hiroaki Miyashita
 Author URI: https://wpgogo.com/
-Version: 2.6.7
+Version: 2.7
 Text Domain: custom-field-template
 Domain Path: /
 */
@@ -81,6 +81,7 @@ class custom_field_template {
 		endif;
 		
 		add_filter( 'get_post_metadata', array(&$this, 'get_preview_postmeta'), 10, 4 );
+		add_filter( 'wp_list_table_class_name', array(&$this, 'custom_field_template_wp_list_table_class_name'), 10, 2 );
 	}
 	
 	function custom_field_template_register_activation_hook() {
@@ -495,11 +496,11 @@ class custom_field_template {
 			if ( $locale == 'ja' ) :
 ?>
 <p><a href="https://www.cmswp.jp/" target="_blank"><?php _e( 'Please use CMSxWP Subsc, which is a collection of WordPress plugins useful for various businesses such as EC, membership site, reservation site, event site, attendance management, and so on.', 'custom-field-template' ); ?></a></p>
-<p><?php _e( 'In order to keep developing the Custom Field Template plugin, we need your support. Please make a donation via PayPal! Any amount is welcome.', 'custom-field-template' ); ?> <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=WN7Y2442JPRU6" target="_blank"><?php _e( 'Donate', 'custom-field-template' ); ?></a></p>
+<p><a href="https://www.wpcft.com/" target="_blank"><?php _e( 'We have finally published a manual site for the custom field template plugin. You can also use the custom field refinement search for posts in the admin panel. Please check here.', 'custom-field-template' ); ?></a></p>
 <?php
 			else :
 ?>
-<p><?php _e( 'In order to keep developing the Custom Field Template plugin, we need your support. Please make a donation via PayPal! Any amount is welcome.', 'custom-field-template' ); ?> <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=WN7Y2442JPRU6" target="_blank"><?php _e( 'Donate', 'custom-field-template' ); ?></a></p>
+<p><a href="https://www.wpcft.com/" target="_blank"><?php _e( 'We have finally published a manual site for the custom field template plugin. You can also use the custom field refinement search for posts in the admin panel. Please check here.', 'custom-field-template' ); ?></a></p>
 <?php
 			endif;
 ?>
@@ -1058,6 +1059,29 @@ type = file';
 		endif;
 	}
 
+	function custom_field_template_check_authentication_key( $auth_key ) {
+		$request = wp_remote_get( 'https://www.wpcft.com/auth/?domain=' . $_SERVER['HTTP_HOST'] . '&auth_key=' . $auth_key );
+		if ( ! is_wp_error( $request ) && $request['response']['code'] == 200 ) :
+			if ( $request['body'] == 1 ) :
+				return true;
+			else :
+				return false;
+			endif;
+		else :
+			return false;
+		endif;
+	}
+
+	function custom_field_template_wp_list_table_class_name( $class_name, $args ) {
+		$options = $this->get_custom_field_template_data();
+		$adminsearch = isset( $options['premium_settings']['adminsearch'][$args['screen']->post_type] ) ? $options['premium_settings']['adminsearch'][$args['screen']->post_type] : '';
+		if ( ! empty( $options['custom_field_template_premium_code'] ) && $adminsearch != '' && strstr( $_SERVER['REQUEST_URI'], 'wp-admin/edit.php') ) :
+			return 'CFT_WP_Posts_List_Table';
+		else :
+			return $class_name;
+		endif;
+	}
+
 	function custom_field_template_admin() {
 		global $wp_version;
 		$locale = get_locale();
@@ -1129,9 +1153,24 @@ type = file';
 					update_option('custom_field_template_data', $options);
 					$message = __('Options updated.', 'custom-field-template');
 				elseif( !empty($_POST["custom_field_template_premium_settings_submit"]) ) :
-					$options['custom_field_template_admin_post_search'] = !empty($_POST['custom_field_template_admin_post_search']) ? $_POST['custom_field_template_admin_post_search'] : '';
-					update_option('custom_field_template_data', $options);
-					$message = __('Options updated.', 'custom-field-template');		
+					if ( ! empty( $_POST['custom_field_template_premium_code'] ) ) :
+						$check_value = $this->custom_field_template_check_authentication_key( $_POST['custom_field_template_premium_code'] );
+						if ( $check_value == false ) :
+							$custom_field_template_premium_code = '';
+						else :
+							$custom_field_template_premium_code = sanitize_text_field( $_POST['custom_field_template_premium_code'] );					
+						endif;
+						$options['custom_field_template_premium_code'] = $custom_field_template_premium_code;
+						if ( ! empty( $_POST["adminsearch"] ) ) :
+							foreach( $_POST["adminsearch"] as $key => $val ) :
+								if( isset( $val ) && is_numeric( $val ) ) :
+									$options['premium_settings']['adminsearch'][$key] = $val;
+								endif;
+							endforeach;
+						endif;
+						update_option('custom_field_template_data', $options);
+						$message = __('Options updated.', 'custom-field-template');
+					endif;
 				elseif ( !empty($_POST['custom_field_template_css_submit']) ) :
 					$options['css'] = $_POST['custom_field_template_css'];
 					update_option('custom_field_template_data', $options);
@@ -1321,7 +1360,6 @@ margin-bottom:0pt;
 </div>
 </div>
 
-<?php /*
 <div class="postbox closed">
 <div class="handlediv" title="<?php _e('Click to toggle', 'custom-field-template'); ?>"><br /></div>
 <h3><?php _e('Premium Settings', 'custom-field-template'); ?></h3>
@@ -1334,7 +1372,33 @@ margin-bottom:0pt;
 </td>
 </tr>
 <tr><td>
-<p><label for="custom_field_template_admin_post_search"><?php _e('Admin Post Search', 'custom-field-template'); ?>: <input type="text" name="custom_field_template_admin_post_search" id="custom_field_template_admin_search" value="<?php echo !empty($options['custom_field_template_admin_post_search']) ? esc_attr($options['custom_field_template_admin_post_search']) : ''; ?>" class="regular-text" /></label> <?php if ( !empty($options['custom_field_template_admin_post_search']) && $this->custom_field_template_check_premium_code($options['custom_field_template_admin_post_search'], 'admin_post_search') ) echo 'OK'; ?></p>
+<p><label for="custom_field_template_premium_code"><?php _e('Premium Code', 'custom-field-template'); ?>: <input type="text" name="custom_field_template_premium_code" id="custom_field_template_premium_code" value="<?php echo !empty($options['custom_field_template_premium_code']) ? esc_attr($options['custom_field_template_premium_code']) : ''; ?>" class="large-text" /></label></p>
+</td>
+</tr>
+<tr><td>
+<p><?php _e('Custom Field Refinement Search', 'custom-field-template'); ?>:</p>
+<?php
+	$args = [
+		'public' => true,
+		'_builtin' => false
+	];
+	$post_types = get_post_types( $args );
+	$post_types = array_merge( ['post', 'page'], array_values( $post_types ) );
+	foreach ( $post_types as $post_type ) :
+?>
+<p><?php echo $post_type; ?>: <select name="adminsearch[<?php echo $post_type; ?>]">
+<option value=""></option>
+<?php
+		$cf_count = isset($options['custom_fields']) && is_array($options['custom_fields']) ? count($options['custom_fields']) : 1;
+		for ( $i = 0; $i < $cf_count; $i++ ) :
+?>
+<option value="<?php echo $i; ?>"<?php if ( isset( $options['premium_settings']['adminsearch'][$post_type] ) && $options['premium_settings']['adminsearch'][$post_type] == $i ) echo ' selected="selected"'; ?>>TEMPLATE #<?php echo $i; ?></option>
+<?php
+		endfor;
+?></select></p>
+<?php
+	endforeach;
+?>
 </td>
 </tr>
 <tr><td>
@@ -1342,10 +1406,10 @@ margin-bottom:0pt;
 </td></tr>
 </tbody>
 </table>
+<?php wp_nonce_field( 'cft', '_wpnonce', true, true ); ?>
 </form>
 </div>
 </div>
-*/ ?>
 
 <div class="postbox closed">
 <div class="handlediv" title="<?php _e('Click to toggle', 'custom-field-template'); ?>"><br /></div>
@@ -4054,7 +4118,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 							case 'textfield':
 							case 'textarea':
 								if ( !empty($val['class']) ) $class = ' class="' . $val['class'] . '"'; 
-								$output .= '<dd><input type="text" name="cftsearch[' . rawurlencode($key) . '][' . $key . '][]" value="' . (isset($_REQUEST['cftsearch'][rawurlencode($key)][0][0]) ? esc_attr($_REQUEST['cftsearch'][rawurlencode($key)][0][0]) : '') . '"' . $class . ' /></dd>';
+								$output .= '<dd><input type="text" name="cftsearch[' . rawurlencode($key) . '][0][]" value="' . (isset($_REQUEST['cftsearch'][rawurlencode($key)][0][0]) ? esc_attr($_REQUEST['cftsearch'][rawurlencode($key)][0][0]) : '') . '"' . $class . ' /></dd>';
 								break;		
 							case 'checkbox':
 								$checked = '';
@@ -4062,7 +4126,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 								if ( isset($_REQUEST['cftsearch'][rawurlencode($key)]) && is_array($_REQUEST['cftsearch'][rawurlencode($key)]) ) 
 									foreach ( $_REQUEST['cftsearch'][rawurlencode($key)] as $values )
 										if ( $val['value'] == $values[0] ) $checked = ' checked="checked"';
-								$output .= '<dd><label><input type="checkbox" name="cftsearch[' . rawurlencode($key) . '][' . $key . '][]" value="' . esc_attr($val['value']) . '"' . $class . $checked . ' /> ';
+								$output .= '<dd><label><input type="checkbox" name="cftsearch[' . rawurlencode($key) . '][0][]" value="' . esc_attr($val['value']) . '"' . $class . $checked . ' /> ';
 								if ( !empty($val['valueLabel']) )
 									$output .= stripcslashes($val['valueLabel']);
 								else
@@ -4078,7 +4142,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 									$checked = '';
 									$metaval = trim($metaval);
 									if ( isset($_REQUEST['cftsearch'][rawurlencode($key)][0][0]) && $_REQUEST['cftsearch'][rawurlencode($key)][0][0] == $metaval ) $checked = 'checked="checked"';
-									$output .= '<dd><label>' . '<input type="radio" name="cftsearch[' . rawurlencode($key) . '][' . $key . '][]" value="' . esc_attr($metaval) . '"' . $class . $checked . ' /> ';			
+									$output .= '<dd><label>' . '<input type="radio" name="cftsearch[' . rawurlencode($key) . '][0][]" value="' . esc_attr($metaval) . '"' . $class . $checked . ' /> ';			
 									if ( !empty($val['valueLabel']) )
 										$output .= stripcslashes(trim($valueLabel[$i]));
 									else
@@ -4091,7 +4155,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 								if ( !empty($val['class']) ) $class = ' class="' . $val['class'] . '"'; 
 								$values = explode( '#', $val['value'] );
 								$valueLabel = isset($val['valueLabel']) ? explode( '#', $val['valueLabel'] ) : '';
-								$output .= '<dd><select name="cftsearch[' . rawurlencode($key) . '][' . $key . '][]"' . $class . '>';
+								$output .= '<dd><select name="cftsearch[' . rawurlencode($key) . '][0][]"' . $class . '>';
 								$output .= '<option value=""></option>';
 								$i=0;
 								foreach ( $values as $metaval ) :
@@ -4210,7 +4274,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 			endforeach;
 		endif;
 		
-		if ( isset($_REQUEST['s']) ) :
+		if ( isset($_REQUEST['s']) && $_REQUEST['s'] != '' ) :
 			$where .= ' AND (';
 			$s = preg_split('/[\s|\x{3000}]+/u', $_REQUEST['s']);
 			$i=0;
@@ -4221,7 +4285,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 					$i++;
 				endif;
 			endforeach;
-			$where .= $wpdb->prepare(" OR ((`" . $wpdb->posts . "`.post_title LIKE %s) OR (`" . $wpdb->posts . "`.post_content LIKE %s))", '%'.trim($_REQUEST['s']).'%', '%'.trim($_REQUEST['s']).'%');
+			$where .= $wpdb->prepare(" OR ((`" . $wpdb->posts . "`.post_title LIKE %s) OR (`" . $wpdb->posts . "`.post_excerpt LIKE %s) OR (`" . $wpdb->posts . "`.post_content LIKE %s))", '%'.trim($_REQUEST['s']).'%', '%'.trim($_REQUEST['s']).'%', '%'.trim($_REQUEST['s']).'%');
 			$where .= ') ';
 		endif;
 
@@ -4247,6 +4311,8 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 				
 		if ( !empty($_REQUEST['no_is_search']) ) :
 			$where .= " AND `".$wpdb->posts."`.post_status = 'publish'";
+		elseif ( is_admin() ) :
+			$where .= " AND (`".$wpdb->posts."`.post_status = 'publish' OR `".$wpdb->posts."`.post_status = 'future' OR `".$wpdb->posts."`.post_status = 'draft' OR `".$wpdb->posts."`.post_status = 'pending' OR `".$wpdb->posts."`.post_status = 'private') GROUP BY `".$wpdb->posts."`.ID";
 		else :
 			$where .= " AND `".$wpdb->posts."`.post_status = 'publish' GROUP BY `".$wpdb->posts."`.ID";
 		endif;
@@ -4454,5 +4520,132 @@ function esc_url( $url, $protocols = null ) {
 }
 endif;
 
+if ( ! class_exists( 'WP_List_Table' ) ) {
+    require_once( ABSPATH . 'wp-admin/includes/class-wp-list-table.php' );
+}
+
+if ( ! class_exists( 'WP_Posts_List_Table' ) ) {
+    require_once( ABSPATH . 'wp-admin/includes/class-wp-posts-list-table.php' );
+}
+
+class CFT_WP_Posts_List_Table extends WP_Posts_List_Table {
+    public function __construct() {
+        parent::__construct();
+    }
+
+	public function search_box( $text, $input_id ) {
+		global $custom_field_template;
+		
+		/*if ( empty( $_REQUEST['s'] ) && ! $this->has_items() ) {
+			return;
+		}*/
+
+		$input_id = $input_id . '-search-input';
+
+		if ( ! empty( $_REQUEST['orderby'] ) ) {
+			echo '<input type="hidden" name="orderby" value="' . esc_attr( $_REQUEST['orderby'] ) . '" />';
+		}
+		if ( ! empty( $_REQUEST['order'] ) ) {
+			echo '<input type="hidden" name="order" value="' . esc_attr( $_REQUEST['order'] ) . '" />';
+		}
+		if ( ! empty( $_REQUEST['post_mime_type'] ) ) {
+			echo '<input type="hidden" name="post_mime_type" value="' . esc_attr( $_REQUEST['post_mime_type'] ) . '" />';
+		}
+		if ( ! empty( $_REQUEST['detached'] ) ) {
+			echo '<input type="hidden" name="detached" value="' . esc_attr( $_REQUEST['detached'] ) . '" />';
+		}
+		?>
+<p class="search-box">
+<?php
+			$fields = $custom_field_template->get_custom_fields( 0 );
+
+			$output = '';
+			foreach( $fields as $field_key => $field_val) :
+				foreach( $field_val as $key => $val) :
+					if ( isset($val['adminsearch']) && $val['adminsearch'] == true ) :
+						if ( !empty($val['label']) && !empty($options['custom_field_template_replace_keys_by_labels']) )
+							$label = stripcslashes($val['label']);
+						else $label = $key;
+						if ( !isset($val['hideKey']) || $val['hideKey'] != true) :
+							$output .= '<label>' . $label . '</label>' ."\n";
+						endif;
+
+						$class = "";
+						switch ( $val['type'] ) :
+							case 'text':
+							case 'textfield':
+							case 'textarea':
+								if ( !empty($val['class']) ) $class = ' class="' . $val['class'] . '"'; 
+								$output .= '<input type="text" name="cftsearch[' . rawurlencode($key) . '][0][]" value="' . (isset($_REQUEST['cftsearch'][$key][0][0]) ? esc_attr($_REQUEST['cftsearch'][$key][0][0]) : '') . '"' . $class . ' /></dd>';
+								break;		
+							case 'checkbox':
+								$checked = '';
+								if ( !empty($val['class']) ) $class = ' class="' . $val['class'] . '"';
+								if ( isset($_REQUEST['cftsearch'][$key]) && is_array($_REQUEST['cftsearch'][$key]) ) 
+									foreach ( $_REQUEST['cftsearch'][$key] as $values )
+										if ( $val['value'] == $values[0] ) $checked = ' checked="checked"';
+								$output .= '<label><input type="checkbox" name="cftsearch[' . rawurlencode($key) . '][0][]" value="' . esc_attr($val['value']) . '"' . $class . $checked . ' /> ';
+								if ( !empty($val['valueLabel']) )
+									$output .= stripcslashes($val['valueLabel']);
+								else
+									$output .= stripcslashes($val['value']);
+								$output .= '</label>' . "\n";
+								break;
+							case 'radio':
+								if ( !empty($val['class']) ) $class = ' class="' . $val['class'] . '"'; 
+								$values = explode( '#', $val['value'] );
+								$valueLabel = isset($val['valueLabel']) ? explode( '#', $val['valueLabel'] ) : '';
+								$i=0;
+								foreach ( $values as $metaval ) :
+									$checked = '';
+									$metaval = trim($metaval);
+									if ( isset($_REQUEST['cftsearch'][$key][0][0]) && $_REQUEST['cftsearch'][$key][0][0] == $metaval ) $checked = 'checked="checked"';
+									$output .= '<label>' . '<input type="radio" name="cftsearch[' . rawurlencode($key) . '][0][]" value="' . esc_attr($metaval) . '"' . $class . $checked . ' /> ';			
+									if ( !empty($val['valueLabel']) )
+										$output .= stripcslashes(trim($valueLabel[$i]));
+									else
+										$output .= stripcslashes($metaval);
+									$i++;
+									$output .= '</label>' . "\n";
+								endforeach;
+								break;
+							case 'select':
+								if ( !empty($val['class']) ) $class = ' class="' . $val['class'] . '"'; 
+								$values = explode( '#', $val['value'] );
+								$valueLabel = isset($val['valueLabel']) ? explode( '#', $val['valueLabel'] ) : '';
+								$output .= '<select name="cftsearch[' . rawurlencode($key) . '][0][]"' . $class . '>';
+								$output .= '<option value=""></option>';
+								$i=0;
+								foreach ( $values as $metaval ) :
+									$selected = '';
+									$metaval = trim($metaval);
+									if ( isset($_REQUEST['cftsearch'][$key][0][0]) && $_REQUEST['cftsearch'][$key][0][0] == $metaval ) $selected = 'selected="selected"';
+									else $selected = "";
+									$output .= '<option value="' . esc_attr($metaval) . '"' . $selected . '>';			
+									if ( !empty($val['valueLabel']) )
+										$output .= stripcslashes(trim($valueLabel[$i]));
+									else
+										$output .= stripcslashes($metaval);
+									$output .= '</option>' . "\n";
+									$i++;
+								endforeach;
+								$output .= '</select>' . "\n";
+								break;
+						endswitch;
+					endif;
+				endforeach;
+			endforeach;
+			echo $output;
+?>
+	<input type="hidden" name="cftsearch_submit" value="1" />
+	<label class="screen-reader-text" for="<?php echo esc_attr( $input_id ); ?>"><?php echo $text; ?>:</label>
+	<input type="search" id="<?php echo esc_attr( $input_id ); ?>" name="s" value="<?php _admin_search_query(); ?>" />
+		<?php submit_button( $text, '', '', false, array( 'id' => 'search-submit' ) ); ?>
+</p>
+		<?php
+	}
+}
+
+global $custom_field_template;
 $custom_field_template = new custom_field_template();
 ?>

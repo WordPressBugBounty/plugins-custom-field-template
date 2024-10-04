@@ -1,10 +1,10 @@
 === Custom Field Template ===
 Contributors: Hiroaki Miyashita
-Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=WN7Y2442JPRU6
+Donate link: https://www.wpcft.com/
 Tags: custom fields, fields, cft, template, meta
 Requires at least: 2.1
 Tested up to: 6.6.2
-Stable tag: 2.6.7
+Stable tag: 2.7
 License: GPLv2 or later
 
 The Custom Field Template plugin extends the functionality of custom fields.
@@ -113,6 +113,10 @@ See the default template and modify it.
 4. Auto Hook of `the_content()` in the option page of this plugin may help you do this. You can use [cft] shortcodes here. You can switch the cft formats in each category.
 
 == Changelog ==
+
+= 2.7 =
+* Premium Settings.
+* Custom Field Refinement Search for posts in the admin panel.
 
 = 2.6.7 =
 * Bugfix: security fix.
