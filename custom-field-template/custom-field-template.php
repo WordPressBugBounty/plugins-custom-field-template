@@ -5,7 +5,7 @@ Plugin URI: https://www.wpcft.com/
 Description: This plugin adds the default custom fields on the Write Post/Page.
 Author: Hiroaki Miyashita
 Author URI: https://wpgogo.com/
-Version: 2.7.3
+Version: 2.7.4
 Text Domain: custom-field-template
 Domain Path: /
 */
@@ -537,8 +537,8 @@ class custom_field_template {
 	function custom_field_template_dismiss_admin_notices() {
 		if ( !check_ajax_referer( 'cft_admin_notices' ) ) exit();
 
-		//set_transient( 'cft_admin_notices', '1', 14 * DAY_IN_SECONDS );
-		set_transient( 'cft_admin_notices', '1', 60 );
+		set_transient( 'cft_admin_notices', '1', 7 * DAY_IN_SECONDS );
+		//set_transient( 'cft_admin_notices', '1', 60 );
 	}
 	
 	function custom_field_template_edit_form_advanced() {

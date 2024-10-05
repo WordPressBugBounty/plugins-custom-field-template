@@ -4,7 +4,7 @@ Donate link: https://www.wpcft.com/
 Tags: custom fields, fields, cft, template, meta
 Requires at least: 2.1
 Tested up to: 6.6.2
-Stable tag: 2.7.3
+Stable tag: 2.7.4
 License: GPLv2 or later
 
 The Custom Field Template plugin extends the functionality of custom fields.
