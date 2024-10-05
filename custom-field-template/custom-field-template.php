@@ -5,7 +5,7 @@ Plugin URI: https://www.wpcft.com/
 Description: This plugin adds the default custom fields on the Write Post/Page.
 Author: Hiroaki Miyashita
 Author URI: https://wpgogo.com/
-Version: 2.7
+Version: 2.7.3
 Text Domain: custom-field-template
 Domain Path: /
 */
@@ -82,6 +82,7 @@ class custom_field_template {
 		
 		add_filter( 'get_post_metadata', array(&$this, 'get_preview_postmeta'), 10, 4 );
 		add_filter( 'wp_list_table_class_name', array(&$this, 'custom_field_template_wp_list_table_class_name'), 10, 2 );
+		add_action( 'custom_field_template_premium_code_update', array(&$this, 'custom_field_template_premium_code_update') );
 	}
 	
 	function custom_field_template_register_activation_hook() {
@@ -172,8 +173,25 @@ class custom_field_template {
 	
 	function custom_field_template_admin_init() {
 		add_thickbox();
+
+		if ( ! wp_next_scheduled( 'custom_field_template_premium_code_update' ) ) :
+			wp_schedule_event( time(), 'daily', 'custom_field_template_premium_code_update' );
+		endif;
 	}
-	
+
+	function custom_field_template_premium_code_update() {
+		$options = $this->get_custom_field_template_data();
+		$authentication_key = $options['custom_field_template_premium_code'];
+
+		if ( ! empty( $authentication_key ) ) :
+			$check_value = $this->custom_field_template_check_authentication_key( $authentication_key );
+			if ( $check_value == false ) :
+				$options['custom_field_template_premium_code'] = '';				
+				update_option( 'custom_field_template_data', $options );
+			endif;
+		endif;
+	}
+
 	function custom_field_template_add_meta_boxes() {
 		$options = $this->get_custom_field_template_data();
 
@@ -1977,6 +1995,15 @@ hideKey = true<br />
 <input type="hidden" name="hosted_button_id" value="WN7Y2442JPRU6">
 <input type="image" src="https://www.paypal.com/en_US/i/btn/btn_donateCC_LG_global.gif" border="0" name="submit" alt="PayPal">
 </form>
+</div>
+</div>
+
+<div class="postbox" style="min-width:200px;">
+<div class="handlediv" title="<?php _e('Click to toggle', 'custom-field-template'); ?>"><br /></div>
+<h3><?php _e('Custom Field Template Manual', 'custom-field-template'); ?></h3>
+<div class="inside">
+<p><?php _e( 'We have finally published a manual site for the custom field template plugin. You can also use the custom field refinement search for posts in the admin panel. Please check here.', 'custom-field-template' ); ?></p>
+<p style="text-align:center"><a href="https://www.wpcft.com/" target="_blank"><?php _e('Custom Field Template Manual', 'custom-field-template'); ?></a><br /><?php _e('For English', 'custom-field-template'); ?></p>
 </div>
 </div>
 
