@@ -5,7 +5,7 @@ Plugin URI: https://www.wpcft.com/
 Description: This plugin adds the default custom fields on the Write Post/Page.
 Author: Hiroaki Miyashita
 Author URI: https://wpgogo.com/
-Version: 2.7.4
+Version: 2.7.7
 Text Domain: custom-field-template
 Domain Path: /
 */
@@ -15,7 +15,7 @@ This program is based on the rc:custom_field_gui plugin written by Joshua Sigar.
 I appreciate your efforts, Joshua.
 */
 
-/*  Copyright 2008 - 2024 Hiroaki Miyashita
+/*  Copyright 2008 - 2026 Hiroaki Miyashita
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -97,18 +97,21 @@ class custom_field_template {
 		global $wp_version;
 		$options = $this->get_custom_field_template_data();
 		
-		if ( is_user_logged_in() && isset($_REQUEST['post']) && isset($_REQUEST['page']) && $_REQUEST['page'] == 'custom-field-template/custom-field-template.php' && $_REQUEST['cft_mode'] == 'selectbox' ) {
+		if ( is_user_logged_in() && current_user_can('edit_posts') && isset($_REQUEST['post']) && isset($_REQUEST['page']) && $_REQUEST['page'] == 'custom-field-template/custom-field-template.php' && $_REQUEST['cft_mode'] == 'selectbox' ) {
 			echo $this->custom_field_template_selectbox();
 			exit();
 		}
 		
 		if ( is_user_logged_in() && isset($_REQUEST['post']) && isset($_REQUEST['page']) && $_REQUEST['page'] == 'custom-field-template/custom-field-template.php' && $_REQUEST['cft_mode'] == 'ajaxsave' ) {
-			if ( $_REQUEST['post'] > 0 )
+			if ( $_REQUEST['post'] > 0 && current_user_can( 'edit_post', $_REQUEST['post'] ) )
 				$this->edit_meta_value( $_REQUEST['post'], '' );
 			exit();
 		}
-		
-		if ( is_user_logged_in() && isset($_REQUEST['page']) && $_REQUEST['page'] == 'custom-field-template/custom-field-template.php' && $_REQUEST['cft_mode'] == 'ajaxload') {
+
+		if ( is_user_logged_in() && current_user_can('edit_posts') && isset($_REQUEST['page']) && $_REQUEST['page'] == 'custom-field-template/custom-field-template.php' && $_REQUEST['cft_mode'] == 'ajaxload') {
+			if ( isset($_REQUEST['post']) && ! current_user_can( 'edit_post', $_REQUEST['post'] ) ) {
+				exit();
+			}
 			if ( isset($_REQUEST['id']) ) :
 				$id = $_REQUEST['id'];			
 			elseif ( isset($options['posts'][$_REQUEST['post']]) ) :
@@ -2077,7 +2080,7 @@ jQuery(this).addClass("closed");
 
 		$title = $name;
 		$name = $this->sanitize_name( $name );
-		$name_id = preg_replace( '/%/', '', $name );
+		$name_id = preg_replace( '/%/', '', (string) $name );
 
 		if ( isset($code) && is_numeric($code) ) :
 			eval(stripcslashes($options['php'][$code]));
@@ -2166,7 +2169,7 @@ jQuery(this).addClass("closed");
 
 		$title = $name;
 		$name = $this->sanitize_name( $name );
-		$name_id = preg_replace( '/%/', '', $name );
+		$name_id = preg_replace( '/%/', '', (string) $name );
 
 		if ( !$value ) $value = "true";
 
@@ -2228,7 +2231,7 @@ jQuery(this).addClass("closed");
 
 		$title = $name;
 		$name = $this->sanitize_name( $name );
-		$name_id = preg_replace( '/%/', '', $name );
+		$name_id = preg_replace( '/%/', '', (string) $name );
 
 		if ( isset($code) && is_numeric($code) ) :
 			eval(stripcslashes($options['php'][$code]));
@@ -2321,7 +2324,7 @@ jQuery(this).addClass("closed");
 
 		$title = $name;
 		$name = $this->sanitize_name( $name );
-		$name_id = preg_replace( '/%/', '', $name );
+		$name_id = preg_replace( '/%/', '', (string) $name );
 
 		if ( isset($code) && is_numeric($code) ) :
 			eval(stripcslashes($options['php'][$code]));
@@ -2409,7 +2412,7 @@ jQuery(this).addClass("closed");
 
 		$title = $name;
 		$name = $this->sanitize_name( $name );
-		$name_id = preg_replace( '/%/', '', $name );
+		$name_id = preg_replace( '/%/', '', (string) $name );
 		
 		if ( is_numeric($code) ) :
 			eval(stripcslashes($options['php'][$code]));
@@ -2603,7 +2606,7 @@ jQuery(this).addClass("closed");
 
 		$title = $name;
 		$name = $this->sanitize_name( $name );
-		$name_id = preg_replace( '/%/', '', $name );
+		$name_id = preg_replace( '/%/', '', (string) $name );
 
 		if ( !isset($_REQUEST['default']) || (isset($_REQUEST['default']) && $_REQUEST['default'] != true) ) $_REQUEST['default'] = false;
 
@@ -3936,7 +3939,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 			$output .= '</dl>' . "\n";
 		endif;
 
-		return do_shortcode(stripcslashes($output));
+		return do_shortcode($output);
 	}
 	
 	function search_custom_field_values($attr) {
@@ -3949,9 +3952,10 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 			'search_label' => __('Search &raquo;', 'custom-field-template'),
 			'button'      => true
 		), $attr));
-		
+
 		if ( is_numeric($format) && $output = $options['shortcode_format'][$format] ) :
 			$output = stripcslashes($output);
+			$output = do_shortcode($output);
 			$output = '<form method="get" action="'.get_option('home').'/" id="cftsearch'.(int)$format.'">' . "\n" . $output;
 
 			$count = count($options['custom_fields']);
@@ -4211,7 +4215,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 			$output .= '</form>' . "\n";
 		endif;
 		
-		return do_shortcode(stripcslashes($output));
+		return $output;
 	}
 	
 	function search_custom_field_values_callback ( $m ) {
