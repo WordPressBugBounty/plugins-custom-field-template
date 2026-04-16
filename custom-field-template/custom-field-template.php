@@ -5,7 +5,7 @@ Plugin URI: https://www.wpcft.com/
 Description: This plugin adds the default custom fields on the Write Post/Page.
 Author: Hiroaki Miyashita
 Author URI: https://wpgogo.com/
-Version: 2.7.7
+Version: 2.7.8
 Text Domain: custom-field-template
 Domain Path: /
 */
@@ -371,9 +371,9 @@ class custom_field_template {
 				$out .= '<select id="custom_field_template_select">';
 				for ( $i=0; $i < count($options['custom_fields']); $i++ ) {
 					if ( isset($_REQUEST['post']) && isset($options['posts'][$_REQUEST['post']]) && $i == $options['posts'][$_REQUEST['post']] ) {
-						$out .= '<option value="' . $i . '" selected="selected">' . stripcslashes($options['custom_fields'][$i]['title']) . '</option>';
+						$out .= '<option value="' . $i . '" selected="selected">' . esc_html(stripcslashes($options['custom_fields'][$i]['title'])) . '</option>';
 					} else
-						$out .= '<option value="' . $i . '">' . stripcslashes($options['custom_fields'][$i]['title']) . '</option>';
+						$out .= '<option value="' . $i . '">' . esc_html(stripcslashes($options['custom_fields'][$i]['title'])) . '</option>';
 				}
 				$out .= '</select>';
 				$out .= '<input type="button" class="button" value="' . __('Load', 'custom-field-template') . '" onclick="var post = jQuery(this).parent().parent().parent().parent().attr(\'id\').replace(\'edit-\',\'\'); var cftloading_select = function() {jQuery.ajax({type: \'GET\', url: \'?page=custom-field-template/custom-field-template.php&cft_mode=ajaxload&id=\'+jQuery(\'#custom_field_template_select\').val()+\'&post=\'+post, success: function(html) {jQuery(\'#cft\').html(html);}});};cftloading_select(post);" />';
@@ -2120,7 +2120,7 @@ jQuery(this).addClass("closed");
 		$event_output = "";
 		foreach($event as $key => $val) :
 			if ( $val )
-				$event_output .= " " . $key . '="' . stripcslashes(trim($val)) . '"';
+				$event_output .= " " . $key . '="' . esc_attr(stripcslashes(trim($val))) . '"';
 		endforeach;
 		
 		if ( isset($multipleButton) && $multipleButton == true && $date != true && $ct_value == $cftnum ) :
@@ -2143,12 +2143,12 @@ jQuery(this).addClass("closed");
 		if ( $date == true ) :
 			$out_value .= '<script type="text/javascript">' . "\n" .
 					'// <![CDATA[' . "\n";
-			if ( is_numeric($dateFirstDayOfWeek) ) $out_value .= 'Date.firstDayOfWeek = ' . stripcslashes(trim($dateFirstDayOfWeek)) . ";\n";
-			if ( $dateFormat ) $out_value .= 'Date.format = "' . stripcslashes(trim($dateFormat)) . '"' . ";\n";
+			if ( is_numeric($dateFirstDayOfWeek) ) $out_value .= 'Date.firstDayOfWeek = ' . intval($dateFirstDayOfWeek) . ";\n";
+			if ( $dateFormat ) $out_value .= 'Date.format = "' . esc_js(stripcslashes(trim($dateFormat))) . '"' . ";\n";
 			$out_value .=	'jQuery(document).ready(function() { jQuery(".datePicker").css("float", "left"); jQuery(".datePicker").datePicker({';
-			if ( $startDate ) $out_value .= "startDate: " . stripcslashes(trim($startDate));
+			if ( $startDate ) $out_value .= "startDate: " . esc_js(stripcslashes(trim($startDate)));
 			if ( $startDate && $endDate ) $out_value .= ",";
-			if ( $endDate ) $out_value .= "endDate: " . stripcslashes(trim($endDate)) . "";
+			if ( $endDate ) $out_value .= "endDate: " . esc_js(stripcslashes(trim($endDate))) . "";
 			$out_value .= '}); });' . "\n" .
 					'// ]]>' . "\n" .
 					'</script>';
@@ -2195,7 +2195,7 @@ jQuery(this).addClass("closed");
 		$event_output = "";
 		foreach($event as $key => $val) :
 			if ( $val )
-				$event_output .= " " . $key . '="' . stripcslashes(trim($val)) . '"';
+				$event_output .= " " . $key . '="' . esc_attr(stripcslashes(trim($val))) . '"';
 		endforeach;
 
 		$id = $name_id . '_' . $this->sanitize_name( $value ) . '_' . $sid . '_' . $cftnum;
@@ -2211,9 +2211,9 @@ jQuery(this).addClass("closed");
 			$out_value .= '<p class="label">' . wp_kses_post( stripcslashes($label) ) . '</p>';
 		$out_value .=	'<label for="' . $id . '" class="selectit"><input id="' . $id . '" name="' . $name . '[' . $sid . '][' . $cftnum . ']" value="' . esc_attr(stripcslashes(trim($value))) . '"' . $checked . ' type="checkbox"' . $class . $style . $event_output . ' /> ';
 		if ( $valueLabel )
-			$out_value .= stripcslashes(trim($valueLabel));
+			$out_value .= esc_html(stripcslashes(trim($valueLabel)));
 		else
-			$out_value .= stripcslashes(trim($value));
+			$out_value .= esc_html(stripcslashes(trim($value)));
 		$out_value .= '</label> ';
 
 		$out .= $out_value.'</dd></dl>'."\n";
@@ -2263,7 +2263,7 @@ jQuery(this).addClass("closed");
 		$event_output = "";
 		foreach($event as $key => $val) :
 			if ( $val )
-				$event_output .= " " . $key . '="' . stripcslashes(trim($val)) . '"';
+				$event_output .= " " . $key . '="' . esc_attr(stripcslashes(trim($val))) . '"';
 		endforeach;
 
 		if ( $multipleButton == true && $ct_value == $cftnum ) :
@@ -2301,9 +2301,9 @@ jQuery(this).addClass("closed");
 				$out_value .=	
 					'<label for="' . $id . '" class="selectit"><input id="' . $id . '" name="' . $name . '[' . $sid . '][' . $cftnum . ']" value="' . esc_attr(trim(stripcslashes($val))) . '" ' . $checked . ' type="radio"' . $class . $style . $event_output . ' /> ';
 				if ( isset($valueLabels[$i]) )
-					$out_value .= stripcslashes(trim($valueLabels[$i]));
+					$out_value .= esc_html(stripcslashes(trim($valueLabels[$i])));
 				else
-					$out_value .= stripcslashes(trim($val));
+					$out_value .= esc_html(stripcslashes(trim($val)));
 				$out_value .= '</label> ';
 				$i++;
 			}
@@ -2355,7 +2355,7 @@ jQuery(this).addClass("closed");
 		$event_output = "";
 		foreach($event as $key => $val) :
 			if ( $val )
-				$event_output .= " " . $key . '="' . stripcslashes(trim($val)) . '"';
+				$event_output .= " " . $key . '="' . esc_attr(stripcslashes(trim($val))) . '"';
 		endforeach;
 		
 		if ( $multipleButton == true && $ct_value == $cftnum ) :
@@ -2376,7 +2376,7 @@ jQuery(this).addClass("closed");
 		$out_value .=	trim($before).'<select id="' . $name_id . $sid . '_' . $cftnum . '" name="' . $name . '[' . $sid . '][]"' . $class . $style . $event_output . '>';
 		
 		if ( $selectLabel )
-			$out_value .= '<option value="">' . stripcslashes(trim($selectLabel)) . '</option>';
+			$out_value .= '<option value="">' . esc_html(stripcslashes(trim($selectLabel))) . '</option>';
 		else
 			$out_value .= '<option value="">' . __('Select', 'custom-field-template') . '</option>';
 		
@@ -2387,9 +2387,9 @@ jQuery(this).addClass("closed");
 		
 				$out_value .=	'<option value="' . esc_attr(stripcslashes(trim($val))) . '" ' . $checked . '>';
 				if ( isset($valueLabels[$i]) )
-					$out_value .= stripcslashes(trim($valueLabels[$i]));
+					$out_value .= esc_html(stripcslashes(trim($valueLabels[$i])));
 				else
-					$out_value .= stripcslashes(trim($val));
+					$out_value .= esc_html(stripcslashes(trim($val)));
 				$out_value .= '</option>';
 				$i++;
 			}
@@ -2527,7 +2527,7 @@ jQuery(this).addClass("closed");
 		$event_output = "";
 		foreach($event as $key => $val) :
 			if ( $val )
-				$event_output .= " " . $key . '="' . stripcslashes(trim($val)) . '"';
+				$event_output .= " " . $key . '="' . esc_attr(stripcslashes(trim($val))) . '"';
 		endforeach;
 
 		if ( $multipleButton == true && $ct_value == $cftnum ) :
@@ -2901,7 +2901,7 @@ jQuery(this).addClass("closed");
 						if ( isset($data['legend']) || isset($addfield) ) :
 							if ( !isset($data['legend']) ) $data['legend'] = '';
 							if ( !isset($addfield) ) $addfield = '';
-							$tmpout .= '<legend>' . stripcslashes(trim($data['legend'])) . $addfield . '</legend>';
+							$tmpout .= '<legend>' . esc_html(stripcslashes(trim($data['legend']))) . $addfield . '</legend>';
 						endif;
 					}
 					else if( $data['type'] == 'fieldset_close' ) {
@@ -3319,9 +3319,9 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 			if ( isset($options['custom_fields'][$filtered_cft['id']]['disable']) ) :
 			
 			  elseif ( isset($_REQUEST['post']) && isset($options['posts'][$_REQUEST['post']]) && $filtered_cft['id'] == $options['posts'][$_REQUEST['post']] ) :
-				$out .= '<option value="' . $filtered_cft['id'] . '" selected="selected">' . stripcslashes($filtered_cft['title']) . '</option>';
+				$out .= '<option value="' . $filtered_cft['id'] . '" selected="selected">' . esc_html(stripcslashes($filtered_cft['title'])) . '</option>';
 			else :
-				$out .= '<option value="' . $filtered_cft['id'] . '">' . stripcslashes($filtered_cft['title']) . '</option>';
+				$out .= '<option value="' . $filtered_cft['id'] . '">' . esc_html(stripcslashes($filtered_cft['title'])) . '</option>';
 			endif;
 		endforeach;
 		$out .= '</select> ';
@@ -3924,7 +3924,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 								if ( empty($value) && $val['outputNone'] ) $value = $val['outputNone'];
 								if ( isset($val['shortCode']) && $val['shortCode'] == true ) $value = do_shortcode($value);			
 								if ( !empty($val['label']) && !empty($options['custom_field_template_replace_keys_by_labels']) )
-									$key_val = stripcslashes($val['label']);
+									$key_val = wp_kses_post(stripcslashes($val['label']));
 								else $key_val = $key;
 								if ( isset($val['hideKey']) && $val['hideKey'] != true && $num == 0 )
 									$output .= '<dt>' . $key_val . '</dt>' . "\n";
@@ -3952,6 +3952,10 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 			'search_label' => __('Search &raquo;', 'custom-field-template'),
 			'button'      => true
 		), $attr));
+
+		$search_label = wp_strip_all_tags( $search_label );
+		$format = sanitize_text_field( $format );
+		$template = absint( $template );
 
 		if ( is_numeric($format) && $output = $options['shortcode_format'][$format] ) :
 			$output = stripcslashes($output);
@@ -4024,8 +4028,8 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 													$checked = ' checked="checked"';
 
 												$replace_val[$rkey] .= '<li><label><input type="checkbox" name="cftsearch[' . rawurlencode($key) . '][' . $rkey . '][]" value="' . esc_attr($metavalue) . '"' . $class . $checked . '  /> ';			
-												if ( isset($valueLabel[$j]) ) $replace_val[$rkey] .= stripcslashes($valueLabel[$j]);
-												else $replace_val[$rkey] .= stripcslashes($metavalue);
+												if ( isset($valueLabel[$j]) ) $replace_val[$rkey] .= esc_html(stripcslashes($valueLabel[$j]));
+												else $replace_val[$rkey] .= esc_html(stripcslashes($metavalue));
 												$replace_val[$rkey] .= '</label></li>';
 												$j++;
 											endforeach;
@@ -4034,8 +4038,8 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 											if ( isset($_REQUEST['cftsearch']) && $_REQUEST['cftsearch'][rawurlencode($key)][$rkey][0] == esc_attr(trim($values[0])) )
 												$checked = ' checked="checked"';
 											$replace_val[$rkey] .= '<label><input type="checkbox" name="cftsearch[' . rawurlencode($key) . '][' . $rkey . '][]" value="' . esc_attr(trim($values[0])) . '"' . $class . $checked . ' /> ';			
-											if ( $valueLabel[0] ) $replace_val[$rkey] .= stripcslashes(trim($valueLabel[0]));
-											else $replace_val[$rkey] .= stripcslashes(trim($values[0]));
+											if ( $valueLabel[0] ) $replace_val[$rkey] .= esc_html(stripcslashes(trim($valueLabel[0])));
+											else $replace_val[$rkey] .= esc_html(stripcslashes(trim($values[0])));
 											$replace_val[$rkey] .= '</label>';
 										endif;
 										break;
@@ -4062,8 +4066,8 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 												if ( in_array($metavalue, $default) && (isset($_REQUEST['cftsearch']) && !$_REQUEST['cftsearch'][rawurlencode($key)][$rkey]) )
 													$checked = ' checked="checked"';
 												$replace_val[$rkey] .= '<li><label><input type="radio" name="cftsearch[' . rawurlencode($key) . '][' . $rkey . '][]" value="' . esc_attr($metavalue) . '"' . $class . $checked . ' /> ';			
-												if ( isset($valueLabel[$j]) ) $replace_val[$rkey] .= stripcslashes(trim($valueLabel[$j]));
-												else $replace_val[$rkey] .= stripcslashes($metavalue);
+												if ( isset($valueLabel[$j]) ) $replace_val[$rkey] .= esc_html(stripcslashes(trim($valueLabel[$j])));
+												else $replace_val[$rkey] .= esc_html(stripcslashes($metavalue));
 												$replace_val[$rkey] .= '</label></li>';
 												$j++;
 											endforeach;
@@ -4072,8 +4076,8 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 											if ( isset($_REQUEST['cftsearch']) && $_REQUEST['cftsearch'][rawurlencode($key)][$rkey][0] == esc_attr(trim($values[0])) )
 												$checked = ' checked="checked"';
 											$replace_val[$rkey] .= '<label><input type="radio" name="cftsearch[' . rawurlencode($key) . '][]" value="' . esc_attr(trim($values[0])) . '"' . $class . $checked . ' /> ';			
-											if ( $valueLabel[0] ) $replace_val[$rkey] .= stripcslashes(trim($valueLabel[0]));
-											else $replace_val[$rkey] .= stripcslashes(trim($values[0]));
+											if ( $valueLabel[0] ) $replace_val[$rkey] .= esc_html(stripcslashes(trim($valueLabel[0])));
+											else $replace_val[$rkey] .= esc_html(stripcslashes(trim($values[0])));
 											$replace_val[$rkey] .= '</label>';
 										endif;
 										break;
@@ -4099,9 +4103,9 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 											else $selected = "";
 											$replace_val[$rkey] .= '<option value="' . esc_attr($metaval) . '"' . $selected . '>';			
 											if ( isset($valueLabel[$j]) )
-												$replace_val[$rkey] .= stripcslashes(trim($valueLabel[$j]));
+												$replace_val[$rkey] .= esc_html(stripcslashes(trim($valueLabel[$j])));
 											else
-												$replace_val[$rkey] .= stripcslashes($metaval);
+												$replace_val[$rkey] .= esc_html(stripcslashes($metaval));
 											$replace_val[$rkey] .= '</option>' . "\n";
 											$j++;
 										endforeach;
@@ -4136,7 +4140,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 				foreach( $field_val as $key => $val) :
 					if ( isset($val['search']) && $val['search'] == true ) :
 						if ( !empty($val['label']) && !empty($options['custom_field_template_replace_keys_by_labels']) )
-							$label = stripcslashes($val['label']);
+							$label = esc_html(stripcslashes($val['label']));
 						else $label = $key;
 						$output .= '<dl>' ."\n";
 						if ( !isset($val['hideKey']) || $val['hideKey'] != true) :
@@ -4159,9 +4163,9 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 										if ( $val['value'] == $values[0] ) $checked = ' checked="checked"';
 								$output .= '<dd><label><input type="checkbox" name="cftsearch[' . rawurlencode($key) . '][0][]" value="' . esc_attr($val['value']) . '"' . $class . $checked . ' /> ';
 								if ( !empty($val['valueLabel']) )
-									$output .= stripcslashes($val['valueLabel']);
+									$output .= esc_html(stripcslashes($val['valueLabel']));
 								else
-									$output .= stripcslashes($val['value']);
+									$output .= esc_html(stripcslashes($val['value']));
 								$output .= '</label></dd>' . "\n";
 								break;
 							case 'radio':
@@ -4175,9 +4179,9 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 									if ( isset($_REQUEST['cftsearch'][rawurlencode($key)][0][0]) && $_REQUEST['cftsearch'][rawurlencode($key)][0][0] == $metaval ) $checked = 'checked="checked"';
 									$output .= '<dd><label>' . '<input type="radio" name="cftsearch[' . rawurlencode($key) . '][0][]" value="' . esc_attr($metaval) . '"' . $class . $checked . ' /> ';			
 									if ( !empty($val['valueLabel']) )
-										$output .= stripcslashes(trim($valueLabel[$i]));
+										$output .= esc_html(stripcslashes(trim($valueLabel[$i])));
 									else
-										$output .= stripcslashes($metaval);
+										$output .= esc_html(stripcslashes($metaval));
 									$i++;
 									$output .= '</label></dd>' . "\n";
 								endforeach;
@@ -4196,9 +4200,9 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 									else $selected = "";
 									$output .= '<option value="' . esc_attr($metaval) . '"' . $selected . '>';			
 									if ( !empty($val['valueLabel']) )
-										$output .= stripcslashes(trim($valueLabel[$i]));
+										$output .= esc_html(stripcslashes(trim($valueLabel[$i])));
 									else
-										$output .= stripcslashes($metaval);
+										$output .= esc_html(stripcslashes($metaval));
 									$output .= '</option>' . "\n";
 									$i++;
 								endforeach;
@@ -4595,7 +4599,7 @@ class CFT_WP_Posts_List_Table extends WP_Posts_List_Table {
 				foreach( $field_val as $key => $val) :
 					if ( isset($val['adminsearch']) && $val['adminsearch'] == true ) :
 						if ( !empty($val['label']) && !empty($options['custom_field_template_replace_keys_by_labels']) )
-							$label = stripcslashes($val['label']);
+							$label = esc_html(stripcslashes($val['label']));
 						else $label = $key;
 						if ( !isset($val['hideKey']) || $val['hideKey'] != true) :
 							$output .= '<label>' . $label . '</label>' ."\n";
@@ -4617,9 +4621,9 @@ class CFT_WP_Posts_List_Table extends WP_Posts_List_Table {
 										if ( $val['value'] == $values[0] ) $checked = ' checked="checked"';
 								$output .= '<label><input type="checkbox" name="cftsearch[' . rawurlencode($key) . '][0][]" value="' . esc_attr($val['value']) . '"' . $class . $checked . ' /> ';
 								if ( !empty($val['valueLabel']) )
-									$output .= stripcslashes($val['valueLabel']);
+									$output .= esc_html(stripcslashes($val['valueLabel']));
 								else
-									$output .= stripcslashes($val['value']);
+									$output .= esc_html(stripcslashes($val['value']));
 								$output .= '</label>' . "\n";
 								break;
 							case 'radio':
@@ -4633,9 +4637,9 @@ class CFT_WP_Posts_List_Table extends WP_Posts_List_Table {
 									if ( isset($_REQUEST['cftsearch'][$key][0][0]) && $_REQUEST['cftsearch'][$key][0][0] == $metaval ) $checked = 'checked="checked"';
 									$output .= '<label>' . '<input type="radio" name="cftsearch[' . rawurlencode($key) . '][0][]" value="' . esc_attr($metaval) . '"' . $class . $checked . ' /> ';			
 									if ( !empty($val['valueLabel']) )
-										$output .= stripcslashes(trim($valueLabel[$i]));
+										$output .= esc_html(stripcslashes(trim($valueLabel[$i])));
 									else
-										$output .= stripcslashes($metaval);
+										$output .= esc_html(stripcslashes($metaval));
 									$i++;
 									$output .= '</label>' . "\n";
 								endforeach;
@@ -4654,9 +4658,9 @@ class CFT_WP_Posts_List_Table extends WP_Posts_List_Table {
 									else $selected = "";
 									$output .= '<option value="' . esc_attr($metaval) . '"' . $selected . '>';			
 									if ( !empty($val['valueLabel']) )
-										$output .= stripcslashes(trim($valueLabel[$i]));
+										$output .= esc_html(stripcslashes(trim($valueLabel[$i])));
 									else
-										$output .= stripcslashes($metaval);
+										$output .= esc_html(stripcslashes($metaval));
 									$output .= '</option>' . "\n";
 									$i++;
 								endforeach;
