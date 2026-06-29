@@ -5,7 +5,7 @@ Plugin URI: https://www.wpcft.com/
 Description: This plugin adds the default custom fields on the Write Post/Page.
 Author: Hiroaki Miyashita
 Author URI: https://wpgogo.com/
-Version: 2.7.8
+Version: 2.8
 Text Domain: custom-field-template
 Domain Path: /
 */
@@ -97,29 +97,33 @@ class custom_field_template {
 		global $wp_version;
 		$options = $this->get_custom_field_template_data();
 		
-		if ( is_user_logged_in() && current_user_can('edit_posts') && isset($_REQUEST['post']) && isset($_REQUEST['page']) && $_REQUEST['page'] == 'custom-field-template/custom-field-template.php' && $_REQUEST['cft_mode'] == 'selectbox' ) {
+		$cft_mode = isset( $_REQUEST['cft_mode'] ) && is_scalar( $_REQUEST['cft_mode'] ) ? sanitize_key( wp_unslash( $_REQUEST['cft_mode'] ) ) : '';
+		$cft_page = isset( $_REQUEST['page'] ) && is_scalar( $_REQUEST['page'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['page'] ) ) : '';
+		$request_post_id = isset( $_REQUEST['post'] ) && is_scalar( $_REQUEST['post'] ) ? absint( $_REQUEST['post'] ) : 0;
+		
+		if ( is_user_logged_in() && current_user_can('edit_posts') && $request_post_id && $cft_page == 'custom-field-template/custom-field-template.php' && $cft_mode == 'selectbox' ) {
 			echo $this->custom_field_template_selectbox();
 			exit();
 		}
 		
-		if ( is_user_logged_in() && isset($_REQUEST['post']) && isset($_REQUEST['page']) && $_REQUEST['page'] == 'custom-field-template/custom-field-template.php' && $_REQUEST['cft_mode'] == 'ajaxsave' ) {
-			if ( $_REQUEST['post'] > 0 && current_user_can( 'edit_post', $_REQUEST['post'] ) )
-				$this->edit_meta_value( $_REQUEST['post'], '' );
+		if ( is_user_logged_in() && $request_post_id && $cft_page == 'custom-field-template/custom-field-template.php' && $cft_mode == 'ajaxsave' ) {
+			if ( $request_post_id > 0 && current_user_can( 'edit_post', $request_post_id ) )
+				$this->edit_meta_value( $request_post_id, '' );
 			exit();
 		}
 
-		if ( is_user_logged_in() && current_user_can('edit_posts') && isset($_REQUEST['page']) && $_REQUEST['page'] == 'custom-field-template/custom-field-template.php' && $_REQUEST['cft_mode'] == 'ajaxload') {
-			if ( isset($_REQUEST['post']) && ! current_user_can( 'edit_post', $_REQUEST['post'] ) ) {
+		if ( is_user_logged_in() && current_user_can('edit_posts') && $cft_page == 'custom-field-template/custom-field-template.php' && $cft_mode == 'ajaxload') {
+			if ( $request_post_id && ! current_user_can( 'edit_post', $request_post_id ) ) {
 				exit();
 			}
 			if ( isset($_REQUEST['id']) ) :
-				$id = $_REQUEST['id'];			
-			elseif ( isset($options['posts'][$_REQUEST['post']]) ) :
-				$id = $options['posts'][$_REQUEST['post']];
+				$id = is_scalar( $_REQUEST['id'] ) ? absint( $_REQUEST['id'] ) : 0;			
+			elseif ( $request_post_id && isset($options['posts'][$request_post_id]) ) :
+				$id = absint( $options['posts'][$request_post_id] );
 			else :
 				$filtered_cfts = $this->custom_field_template_filter();
 				if ( count($filtered_cfts)>0 ) :
-					$id = $filtered_cfts[0]['id'];
+					$id = absint( $filtered_cfts[0]['id'] );
 				else :
 					$id = 0;
 				endif;
@@ -139,6 +143,7 @@ class custom_field_template {
 		
 		if ( function_exists('current_user_can') && current_user_can('edit_plugins') ) :
 			if ( isset($_POST['custom_field_template_export_options_submit']) ) :
+				check_admin_referer( 'cft', '_wpnonce' );
 				$filename = "cft".date('Ymd');
 				header("Accept-Ranges: none");
 				header("Content-Disposition: attachment; filename=$filename");
@@ -783,26 +788,20 @@ class custom_field_template {
 	
 	function media_send_to_custom_field($html) {
 		if ( strstr($_SERVER['REQUEST_URI'], 'wp-admin/admin-ajax.php') ) return $html;
+		$html_json = wp_json_encode( $html, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
 		$out =  '<script type="text/javascript">' . "\n" .
 					'	/* <![CDATA[ */' . "\n" .
 					'	var win = window.dialogArguments || opener || parent || top;' . "\n" .
 					'   if ( typeof win.send_to_custom_field == "function" ) ' . "\n" .
-					'	    win.send_to_custom_field("' . addslashes($html) . '");' . "\n" .
+					'	    win.send_to_custom_field(' . $html_json . ');' . "\n" .
 					'   else ' . "\n" .
-					'       win.send_to_editor("' . addslashes($html) . '");' . "\n" .
+					'       win.send_to_editor(' . $html_json . ');' . "\n" .
 					'/* ]]> */' . "\n" .
 					'</script>' . "\n";
 
 		echo $out;
 		exit();
-
-		/*if ($options['custom_field_template_use_multiple_insert']) {
-			return;
-		} else {
-			exit();
-		}*/
 	}
-	
 	function wpaq_filter_plugin_actions($links, $file){
 		static $this_plugin;
 
@@ -1072,7 +1071,7 @@ type = file';
 	}
 	
 	function custom_field_template_check_premium_code( $premium_code, $functionality ) {
-		$host = $_SERVER['HTTP_HOST'];
+		$host = isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : '';
 		if ( password_verify( $host.$functionality, $premium_code ) ) :
 			return 1;
 		else :
@@ -1081,7 +1080,15 @@ type = file';
 	}
 
 	function custom_field_template_check_authentication_key( $auth_key ) {
-		$request = wp_remote_get( 'https://www.wpcft.com/auth/?domain=' . $_SERVER['HTTP_HOST'] . '&auth_key=' . $auth_key );
+		$host = isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : parse_url( home_url(), PHP_URL_HOST );
+		$auth_url = add_query_arg(
+			array(
+				'domain' => sanitize_text_field( $host ),
+				'auth_key' => sanitize_text_field( $auth_key ),
+			),
+			'https://www.wpcft.com/auth/'
+		);
+		$request = wp_remote_get( esc_url_raw( $auth_url ) );
 		if ( ! is_wp_error( $request ) && $request['response']['code'] == 200 ) :
 			if ( $request['body'] == 1 ) :
 				return true;
@@ -1092,7 +1099,6 @@ type = file';
 			return false;
 		endif;
 	}
-
 	function custom_field_template_wp_list_table_class_name( $class_name, $args ) {
 		$options = $this->get_custom_field_template_data();
 		$adminsearch = isset( $options['premium_settings']['adminsearch'][$args['screen']->post_type] ) ? $options['premium_settings']['adminsearch'][$args['screen']->post_type] : '';
@@ -2060,6 +2066,32 @@ jQuery(this).addClass("closed");
 		return $name;
 	}
 	
+	function sanitize_datepicker_date_expression( $value ) {
+		$value = trim( stripcslashes( (string) $value ) );
+		if ( $value === '' ) return '';
+
+		if ( preg_match( '/^([\'"])(.*)\1$/s', $value, $matches ) ) :
+			if ( preg_match( '/[\r\n]/', $matches[2] ) ) return '';
+			return wp_json_encode( $matches[2], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
+		endif;
+
+		if ( preg_match( '/^[0-9]{4}[\/.-][0-9]{1,2}[\/.-][0-9]{1,2}$/', $value ) ) :
+			return wp_json_encode( $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
+		endif;
+
+		if ( preg_match( '/^(?:\(?\s*new\s+Date\s*\(\s*\)\s*\)?|Date\.today\s*\(\s*\))(?:\s*\.\s*addDays\s*\(\s*-?[0-9]+\s*\))?\s*\.\s*asString\s*\(\s*\)$/', $value ) ) :
+			return $value;
+		endif;
+
+		return '';
+	}
+	
+	function sanitize_integer_list( $values ) {
+		$values = is_array( $values ) ? $values : explode( ',', (string) $values );
+		$values = array_filter( array_map( 'absint', $values ) );
+		return array_values( array_unique( $values ) );
+	}
+	
 	function get_custom_fields( $id ) {
 		$options = $this->get_custom_field_template_data();
 
@@ -2146,9 +2178,11 @@ jQuery(this).addClass("closed");
 			if ( is_numeric($dateFirstDayOfWeek) ) $out_value .= 'Date.firstDayOfWeek = ' . intval($dateFirstDayOfWeek) . ";\n";
 			if ( $dateFormat ) $out_value .= 'Date.format = "' . esc_js(stripcslashes(trim($dateFormat))) . '"' . ";\n";
 			$out_value .=	'jQuery(document).ready(function() { jQuery(".datePicker").css("float", "left"); jQuery(".datePicker").datePicker({';
-			if ( $startDate ) $out_value .= "startDate: " . esc_js(stripcslashes(trim($startDate)));
-			if ( $startDate && $endDate ) $out_value .= ",";
-			if ( $endDate ) $out_value .= "endDate: " . esc_js(stripcslashes(trim($endDate))) . "";
+			$start_date_expression = $this->sanitize_datepicker_date_expression( $startDate );
+			$end_date_expression = $this->sanitize_datepicker_date_expression( $endDate );
+			if ( $start_date_expression !== '' ) $out_value .= "startDate: " . $start_date_expression;
+			if ( $start_date_expression !== '' && $end_date_expression !== '' ) $out_value .= ",";
+			if ( $end_date_expression !== '' ) $out_value .= "endDate: " . $end_date_expression;
 			$out_value .= '}); });' . "\n" .
 					'// ]]>' . "\n" .
 					'</script>';
@@ -2681,15 +2715,16 @@ jQuery(this).addClass("closed");
 
 	function load_custom_field( $id = 0 ) {
 		global $current_user, $post, $wp_version;
+		$id = absint( $id );
 		$level = $current_user->user_level;
 
 		$options = $this->get_custom_field_template_data();
 		
-		$post_id = isset($_REQUEST['post']) ? $_REQUEST['post'] : '';
+		$post_id = isset($_REQUEST['post']) && is_scalar( $_REQUEST['post'] ) ? absint( $_REQUEST['post'] ) : 0;
 		
-		if ( isset($post_id) ) $post = get_post($post_id);
+		if ( $post_id ) $post = get_post($post_id);
 
-		if ( isset($_REQUEST['revision']) ) $post_id = $_REQUEST['revision'];
+		if ( isset($_REQUEST['revision']) && is_scalar( $_REQUEST['revision'] ) ) $post_id = absint( $_REQUEST['revision'] );
 
 		if ( !empty($options['custom_fields'][$id]['disable']) )
 			return;
@@ -3052,34 +3087,36 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 		
 			foreach ( $options['custom_fields'] as $key => $val ) :
 				if ( !empty($val['category']) ) :
-					$val['category'] = preg_replace('/\s/', '', $val['category']);
-					$categories = explode(',', $val['category']);
-					$categories = array_filter($categories);
-					$categories = array_map( 'trim', $categories );
+					$categories = $this->sanitize_integer_list( $val['category'] );
+					if ( empty( $categories ) ) continue;
 
-					$query = "SELECT * FROM `".$wpdb->prefix."term_taxonomy` WHERE term_id IN (".addslashes($val['category']).")";
+					$placeholders = implode( ',', array_fill( 0, count( $categories ), '%d' ) );
+					$query_args = array_merge( array( "SELECT * FROM `".$wpdb->prefix."term_taxonomy` WHERE term_id IN (" . $placeholders . ")" ), $categories );
+					$query = call_user_func_array( array( $wpdb, 'prepare' ), $query_args );
 					$result = $wpdb->get_results($query, ARRAY_A);
 					$category_taxonomy = array();
 					if ( !empty($result) && is_array($result) ) :
 						for($i=0;$i<count($result);$i++) :
-							$category_taxonomy[$result[$i]['term_id']] = $result[$i]['taxonomy'];
+							$category_taxonomy[absint($result[$i]['term_id'])] = sanitize_key($result[$i]['taxonomy']);
 						endfor;
 					endif;
 					foreach($categories as $cat_id) :
-						if ( is_numeric($cat_id) ) :
-							if ( $taxonomy == 'category' ) $taxonomy = $category_taxonomy[$cat_id];
-							$out .=		'jQuery(\'#in-'.$category_taxonomy[$cat_id].'-' . $cat_id . '\').click(function(){if(jQuery(\'#in-'.$category_taxonomy[$cat_id].'-' . $cat_id . '\').attr(\'checked\') == true) { if(tinyMCEID.length) { for(i=0;i<tinyMCEID.length;i++) {tinyMCE.execCommand(\'mceRemoveControl\', false, tinyMCEID[i]);} tinyMCEID.length=0;}; jQuery.get(\'?page=custom-field-template/custom-field-template.php&cft_mode=selectbox&post=\'+jQuery(\'#post_ID\').val()+\'&\'+jQuery(\'#'.$taxonomy.'-all :input\').fieldSerialize(), function(html) { jQuery(\'#cft_selectbox\').html(html);';
+						$cat_id = absint( $cat_id );
+						if ( $cat_id && ! empty( $category_taxonomy[$cat_id] ) ) :
+							$cat_taxonomy = $category_taxonomy[$cat_id];
+							if ( $taxonomy == 'category' ) $taxonomy = $cat_taxonomy;
+							$out .=		'jQuery(\'#in-'.$cat_taxonomy.'-' . $cat_id . '\').click(function(){if(jQuery(\'#in-'.$cat_taxonomy.'-' . $cat_id . '\').attr(\'checked\') == true) { if(tinyMCEID.length) { for(i=0;i<tinyMCEID.length;i++) {tinyMCE.execCommand(\'mceRemoveControl\', false, tinyMCEID[i]);} tinyMCEID.length=0;}; jQuery.get(\'?page=custom-field-template/custom-field-template.php&cft_mode=selectbox&post=\'+jQuery(\'#post_ID\').val()+\'&\'+jQuery(\'#'.$taxonomy.'-all :input\').fieldSerialize(), function(html) { jQuery(\'#cft_selectbox\').html(html);';
 							if ( !empty($options['custom_field_template_use_autosave']) ) :
 								$out .= ' var fields = jQuery(\'#cft'.$suffix.' :input\').fieldSerialize();';
 								$out .= 'jQuery.ajax({type: \'POST\', url: \'?page=custom-field-template/custom-field-template.php&cft_mode=ajaxsave&post=\'+jQuery(\'#post_ID\').val()+\'&custom-field-template-verify-key=\'+jQuery(\'#custom-field-template-verify-key\').val()+\'&\'+fields, success: function(){jQuery(\'#custom_field_template_select\').val(\'' . $key . '\');jQuery.ajax({type: \'GET\', url: \'?page=custom-field-template/custom-field-template.php&cft_mode=ajaxload&id=' . $key . '&post=\'+jQuery(\'#post_ID\').val(), success: function(html) {';
 								if ( !empty($options['custom_field_template_replace_the_title']) ) :
-									$out .= 'jQuery(\'#cftdiv'.$suffix.' h3 span\').text(\'' . $options['custom_fields'][$key]['title'] . '\');';
+									$out .= 'jQuery(\'#cftdiv'.$suffix.' h3 span\').text(\'' . esc_js( stripcslashes( $options['custom_fields'][$key]['title'] ) ) . '\');';
 								endif;
 								$out .= 'jQuery(\'#cft\').html(html);}});}});';
 							else :
 								$out .=		'	jQuery(\'#custom_field_template_select\').val(\'' . $key . '\');jQuery.ajax({type: \'GET\', url: \'?page=custom-field-template/custom-field-template.php&cft_mode=ajaxload&id=' . $key . '&post=\'+jQuery(\'#post_ID\').val()+\'&\'+jQuery(\'#'.$taxonomy.'-all :input\').fieldSerialize(), success: function(html) {';
 								if ( !empty($options['custom_field_template_replace_the_title']) ) :
-									$out .= 'jQuery(\'#cftdiv'.$suffix.' h3 span\').text(\'' . $options['custom_fields'][$key]['title'] . '\');';
+									$out .= 'jQuery(\'#cftdiv'.$suffix.' h3 span\').text(\'' . esc_js( stripcslashes( $options['custom_fields'][$key]['title'] ) ) . '\');';
 								endif;
 								$out .= 'jQuery(\'#cft\').html(html);}});';
 							endif;
@@ -3087,7 +3124,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 							
 							$out .=		'	}else{ jQuery(\'#cft\').html(\'\');jQuery.get(\'?page=custom-field-template/custom-field-template.php&cft_mode=selectbox&post=\'+jQuery(\'#post_ID\').val()+\'&\'+jQuery(\'#'.$taxonomy.'-all :input\').fieldSerialize(), function(html) { jQuery(\'#cft_selectbox\').html(html); jQuery.ajax({type: \'GET\', url: \'?page=custom-field-template/custom-field-template.php&cft_mode=ajaxload&post=\'+jQuery(\'#post_ID\').val()+\'&\'+jQuery(\'#'.$taxonomy.'-all :input\').fieldSerialize(), success: function(html) { jQuery(\'#cft\').html(html);}}); });';
 							if ( !empty($options['custom_field_template_replace_the_title']) ) :
-								$out .= 'jQuery(\'#cftdiv'.$suffix.' h3 span\').text(\'' . __('Custom Field Template', 'custom-field-template') . '\');';
+								$out .= 'jQuery(\'#cftdiv'.$suffix.' h3 span\').text(\'' . esc_js( __('Custom Field Template', 'custom-field-template') ) . '\');';
 							endif;
 							$out .= '}});' . "\n";
 						endif;
@@ -3097,8 +3134,8 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 		endif;
 
 		if ( empty($options['custom_field_template_deploy_box']) && 0 != count( get_page_templates() ) ):
-			if ( empty($_REQUEST['post_type']) ) $_REQUEST['post_type'] = 'post';
-			$out .=	'jQuery(\'#page_template\').change(function(){ if(tinyMCEID.length) { for(i=0;i<tinyMCEID.length;i++) {tinyMCE.execCommand(\'mceRemoveControl\', false, tinyMCEID[i]);} tinyMCEID.length=0;}; jQuery.get(\'?post_type='.esc_attr($_REQUEST['post_type']).'&page=custom-field-template/custom-field-template.php&cft_mode=selectbox&post=\'+jQuery(\'#post_ID\').val()+\'&page_template=\'+jQuery(\'#page_template\').val(), function(html) { jQuery(\'#cft_selectbox\').html(html); jQuery.ajax({type: \'GET\', url: \'?post_type='.esc_attr($_REQUEST['post_type']).'&page=custom-field-template/custom-field-template.php&cft_mode=ajaxload&page_template=\'+jQuery(\'#page_template\').val()+\'&post=\'+jQuery(\'#post_ID\').val(), success: function(html) { jQuery(\'#cft\').html(html);';
+			$post_type = empty($_REQUEST['post_type']) || ! is_scalar( $_REQUEST['post_type'] ) ? 'post' : sanitize_key( wp_unslash( $_REQUEST['post_type'] ) );
+			$out .=	'jQuery(\'#page_template\').change(function(){ if(tinyMCEID.length) { for(i=0;i<tinyMCEID.length;i++) {tinyMCE.execCommand(\'mceRemoveControl\', false, tinyMCEID[i]);} tinyMCEID.length=0;}; jQuery.get(\'?post_type='.rawurlencode($post_type).'&page=custom-field-template/custom-field-template.php&cft_mode=selectbox&post=\'+jQuery(\'#post_ID\').val()+\'&page_template=\'+jQuery(\'#page_template\').val(), function(html) { jQuery(\'#cft_selectbox\').html(html); jQuery.ajax({type: \'GET\', url: \'?post_type='.rawurlencode($post_type).'&page=custom-field-template/custom-field-template.php&cft_mode=ajaxload&page_template=\'+jQuery(\'#page_template\').val()+\'&post=\'+jQuery(\'#post_ID\').val(), success: function(html) { jQuery(\'#cft\').html(html);';
 			if ( !empty($options['custom_field_template_replace_the_title']) ) :
 				$out .= 'if(html) { jQuery(\'#cftdiv'.$suffix.' h3 span\').text(jQuery(\'#custom_field_template_select :selected\').text());}';
 			endif;
@@ -3163,7 +3200,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 		} else {
 			if ( $body && !empty($options['custom_field_template_replace_the_title']) && empty($options['custom_field_template_deploy_box']) ) :
 				$out .= '<script type="text/javascript">' . "\n" . '// <![CDATA[' . "\n";
-				$out .=	'jQuery(document).ready(function() {jQuery(\'#cftdiv h3 span\').text(\'' . $options['custom_fields'][$init_id]['title'] . '\');});' . "\n";
+				$out .=	'jQuery(document).ready(function() {jQuery(\'#cftdiv h3 span\').text(\'' . esc_js( stripcslashes( $options['custom_fields'][$init_id]['title'] ) ) . '\');});' . "\n";
 				$out .= '// ]]>' . "\n" . '</script>';
 			endif;
 		}
@@ -3178,8 +3215,8 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 		$options = $this->get_custom_field_template_data();
 		$filtered_cfts = array();
 		
-		$post_id = isset($_REQUEST['post']) ? $_REQUEST['post'] : '';
-		if ( empty($post) ) $post = get_post($post_id);
+		$post_id = isset($_REQUEST['post']) && is_scalar( $_REQUEST['post'] ) ? absint( $_REQUEST['post'] ) : 0;
+		if ( empty($post) && $post_id ) $post = get_post($post_id);
 		
 		$categories = get_the_category($post_id);
 		$cats = array();
@@ -3187,10 +3224,10 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 		
 		if ( !empty($_REQUEST['tax_input']) && is_array($_REQUEST['tax_input']) ) :
 			foreach($_REQUEST['tax_input'] as $key => $val) :
-				$cats = array_merge($cats, $val);
+				if ( is_array( $val ) ) $cats = array_merge($cats, $this->sanitize_integer_list( $val ) );
 			endforeach;
-		elseif ( !empty($_REQUEST['post_category']) ) :
-			$cats = array_merge($cats, $_REQUEST['post_category']);
+		elseif ( !empty($_REQUEST['post_category']) && is_array( $_REQUEST['post_category'] ) ) :
+			$cats = array_merge($cats, $this->sanitize_integer_list( $_REQUEST['post_category'] ) );
 		endif;
 
 		for ( $i=0; $i < count($options['custom_fields']); $i++ ) :
@@ -3314,11 +3351,12 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 			return '&nbsp;';
 		endif;
 		
+		$request_post = isset( $_REQUEST['post'] ) && is_scalar( $_REQUEST['post'] ) ? absint( $_REQUEST['post'] ) : 0;
 		$out = '<select id="custom_field_template_select">';
 		foreach ( $filtered_cfts as $filtered_cft ) :
 			if ( isset($options['custom_fields'][$filtered_cft['id']]['disable']) ) :
 			
-			  elseif ( isset($_REQUEST['post']) && isset($options['posts'][$_REQUEST['post']]) && $filtered_cft['id'] == $options['posts'][$_REQUEST['post']] ) :
+			  elseif ( $request_post && isset($options['posts'][$request_post]) && $filtered_cft['id'] == $options['posts'][$request_post] ) :
 				$out .= '<option value="' . $filtered_cft['id'] . '" selected="selected">' . esc_html(stripcslashes($filtered_cft['title'])) . '</option>';
 			else :
 				$out .= '<option value="' . $filtered_cft['id'] . '">' . esc_html(stripcslashes($filtered_cft['title'])) . '</option>';
@@ -3327,7 +3365,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 		$out .= '</select> ';
 		
 		$post_type = '';
-		if ( !empty($_REQUEST['post_type']) ) $post_type = '+\'&post_type='.esc_attr($_REQUEST['post_type']).'\'';
+		if ( !empty($_REQUEST['post_type']) && is_scalar( $_REQUEST['post_type'] ) ) $post_type = '+\'&post_type='.rawurlencode( sanitize_key( wp_unslash( $_REQUEST['post_type'] ) ) ).'\'';
 		
 		$out .= '<input type="button" class="button" value="' . __('Load', 'custom-field-template') . '" onclick="if(tinyMCEID.length) { for(i=0;i<tinyMCEID.length;i++) {tinyMCE.execCommand(\'mceRemoveControl\', false, tinyMCEID[i]);} tinyMCEID.length=0;};';
 		$out .= ' var cftloading_select = function() {jQuery.ajax({type: \'GET\', url: \'?page=custom-field-template/custom-field-template.php&cft_mode=ajaxload&id=\'+jQuery(\'#custom_field_template_select\').val()+\'&post=\'+jQuery(\'#post_ID\').val()'.$post_type.'+\'&page_template=\'+jQuery(\'#page_template\').val(), success: function(html) {';
@@ -3350,19 +3388,23 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 		global $wpdb, $wp_version, $current_user;
 		$options = $this->get_custom_field_template_data();
 
-		if( !isset( $id ) || isset($_REQUEST['post_ID']) )
-			$id = $_REQUEST['post_ID'];
+		if ( empty( $id ) ) :
+			$id = ( isset( $_REQUEST['post_ID'] ) && is_scalar( $_REQUEST['post_ID'] ) ) ? absint( $_REQUEST['post_ID'] ) : 0;
+		else :
+			$id = absint( $id );
+		endif;
 
-		if( !current_user_can('edit_post', $id) )
+		if( ! $id || ! current_user_can('edit_post', $id) )
 			return $id;
 		
 		if ( empty($_REQUEST['custom-field-template-verify-key']) )
 			return $id;
 								
-		if( !wp_verify_nonce($_REQUEST['custom-field-template-verify-key'], 'custom-field-template') )
+		$verify_key = is_scalar( $_REQUEST['custom-field-template-verify-key'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['custom-field-template-verify-key'] ) ) : '';
+		if( !wp_verify_nonce($verify_key, 'custom-field-template') )
 			return $id;
 
-		if ( !empty($_POST['wp-preview']) && $id != $post->ID ) :
+		if ( !empty($_POST['wp-preview']) && is_object( $post ) && $id != $post->ID ) :
 			/*$revision_ids = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_parent = %d AND post_type = 'revision'", $id ) );
 			$wpdb->query( "DELETE FROM $wpdb->postmeta WHERE post_id IN (" . implode( ',', $revision_ids ) . ")" );
 				
@@ -3395,6 +3437,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 
 		if ( !empty($_REQUEST['custom-field-template-id']) && is_array($_REQUEST['custom-field-template-id']) ) :
 			foreach ( $_REQUEST['custom-field-template-id'] as $cft_id ) :
+		$cft_id = is_scalar( $cft_id ) ? absint( $cft_id ) : 0;
 		$fields = $this->get_custom_fields($cft_id);
 		
 		if ( $fields == null )
@@ -4266,7 +4309,7 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 			endfor;
 		endif;
 			
-		if ( is_array($_REQUEST['cftsearch']) ) :
+		if ( isset($_REQUEST['cftsearch']) && is_array($_REQUEST['cftsearch']) ) :
 			foreach ( $_REQUEST['cftsearch'] as $key => $val ) :
 				$key = rawurldecode($key);
 				if ( is_array($val) ) :
@@ -4325,23 +4368,25 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 		endif;
 
 		if ( isset($_REQUEST['cftcategory_in']) && is_array($_REQUEST['cftcategory_in']) ) :
-			$ids = get_objects_in_term($_REQUEST['cftcategory_in'], 'category');
-			if ( is_array($ids) && count($ids) > 0 ) :
-				$in_posts = "'" . implode("', '", $ids) . "'";
-				$where .= " AND ID IN (" . $in_posts . ")";
+			$term_ids = $this->sanitize_integer_list( $_REQUEST['cftcategory_in'] );
+			$ids = $term_ids ? get_objects_in_term($term_ids, 'category') : array();
+			$ids = $this->sanitize_integer_list( $ids );
+			if ( count($ids) > 0 ) :
+				$where .= " AND ID IN (" . implode(',', $ids) . ")";
 			endif;
 			$where .= " AND `" . $wpdb->posts . "`.post_type = 'post'"; 
 		endif;
 		if ( isset($_REQUEST['cftcategory_not_in']) && is_array($_REQUEST['cftcategory_not_in']) ) :
-			$ids = get_objects_in_term($_REQUEST['cftcategory_not_in'], 'category');
-			if ( is_array($ids) && count($ids) > 0 ) :
-				$in_posts = "'" . implode("', '", $ids) . "'";
-				$where .= " AND ID NOT IN (" . $in_posts . ")";
+			$term_ids = $this->sanitize_integer_list( $_REQUEST['cftcategory_not_in'] );
+			$ids = $term_ids ? get_objects_in_term($term_ids, 'category') : array();
+			$ids = $this->sanitize_integer_list( $ids );
+			if ( count($ids) > 0 ) :
+				$where .= " AND ID NOT IN (" . implode(',', $ids) . ")";
 			endif;
 		endif;
 		
-		if ( !empty($_REQUEST['post_type']) ) :
-			$where .= $wpdb->prepare(" AND `" . $wpdb->posts . "`.post_type = %s", trim($_REQUEST['post_type'])); 
+		if ( !empty($_REQUEST['post_type']) && is_scalar( $_REQUEST['post_type'] ) ) :
+			$where .= $wpdb->prepare(" AND `" . $wpdb->posts . "`.post_type = %s", sanitize_key( wp_unslash( $_REQUEST['post_type'] ) ) ); 
 		endif;
 				
 		if ( !empty($_REQUEST['no_is_search']) ) :
@@ -4356,11 +4401,13 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 	}
 
 	function custom_field_template_posts_join($sql) {
-		if ( !empty($_REQUEST['orderby']) && !in_array($_REQUEST['orderby'], array('post_author', 'post_date', 'post_title', 'post_modified', 'menu_order', 'post_parent', 'ID')) ):
-			if ( (strtoupper($_REQUEST['order']) == 'ASC' || strtoupper($_REQUEST['order']) == 'DESC') ) :
+		$orderby = ! empty($_REQUEST['orderby']) && is_scalar( $_REQUEST['orderby'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['orderby'] ) ) : '';
+		$order = ! empty($_REQUEST['order']) && is_scalar( $_REQUEST['order'] ) ? strtoupper( sanitize_key( $_REQUEST['order'] ) ) : 'DESC';
+		if ( $orderby && !in_array($orderby, array('post_author', 'post_date', 'post_title', 'post_modified', 'menu_order', 'post_parent', 'ID', 'rand'), true) ):
+			if ( $order == 'ASC' || $order == 'DESC' ) :
 				global $wpdb;
 
-				$sql = $wpdb->prepare(" LEFT JOIN `" . $wpdb->postmeta . "` AS meta ON (`" . $wpdb->posts . "`.ID = meta.post_id AND meta.meta_key = %s)", $_REQUEST['orderby']); 
+				$sql = $wpdb->prepare(" LEFT JOIN `" . $wpdb->postmeta . "` AS meta ON (`" . $wpdb->posts . "`.ID = meta.post_id AND meta.meta_key = %s)", $orderby); 
 				return $sql;
 			endif;
 		endif;
@@ -4369,26 +4416,28 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 	function custom_field_template_posts_orderby($sql) {
 		global $wpdb;
 
-		if ( empty($_REQUEST['order']) || ((strtoupper($_REQUEST['order']) != 'ASC') && (strtoupper($_REQUEST['order']) != 'DESC')) )
-			$_REQUEST['order'] = 'DESC';
+		$order = ! empty($_REQUEST['order']) && is_scalar( $_REQUEST['order'] ) ? strtoupper( sanitize_key( $_REQUEST['order'] ) ) : 'DESC';
+		if ( $order != 'ASC' && $order != 'DESC' ) $order = 'DESC';
+		$orderby = ! empty($_REQUEST['orderby']) && is_scalar( $_REQUEST['orderby'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['orderby'] ) ) : '';
 
-		if ( !empty($_REQUEST['orderby']) ) :
-			if ( in_array($_REQUEST['orderby'], array('post_author', 'post_date', 'post_title', 'post_modified', 'menu_order', 'post_parent', 'ID')) ):
-				$sql = "`" . $wpdb->posts . "`." . $_REQUEST['orderby'] . " " . $_REQUEST['order'];
-			elseif ( $_REQUEST['orderby'] == 'rand' ):
+		if ( $orderby ) :
+			if ( in_array($orderby, array('post_author', 'post_date', 'post_title', 'post_modified', 'menu_order', 'post_parent', 'ID'), true) ):
+				$sql = "`" . $wpdb->posts . "`." . $orderby . " " . $order;
+			elseif ( $orderby == 'rand' ):
 				$sql = "RAND()";
 			else:
-				if ( !empty($_REQUEST['cast']) && in_array($_REQUEST['cast'], array('binary', 'char', 'date', 'datetime', 'signed', 'time', 'unsigned')) ) :
-					$sql = " CAST(meta.meta_value AS " . $_REQUEST['cast'] . ") " . $_REQUEST['order'];
+				$cast = ! empty($_REQUEST['cast']) && is_scalar( $_REQUEST['cast'] ) ? strtolower( sanitize_key( $_REQUEST['cast'] ) ) : '';
+				if ( $cast && in_array($cast, array('binary', 'char', 'date', 'datetime', 'signed', 'time', 'unsigned'), true) ) :
+					$sql = " CAST(meta.meta_value AS " . strtoupper( $cast ) . ") " . $order;
 				else :
-					$sql = " meta.meta_value " . $_REQUEST['order'];
+					$sql = " meta.meta_value " . $order;
 				endif;
 			endif;
 
 			return $sql;
 		endif;
 
-		$sql = "`" . $wpdb->posts . "`.post_date " . $_REQUEST['order'];
+		$sql = "`" . $wpdb->posts . "`.post_date " . $order;
 		return $sql;
 	}
 	
@@ -4397,10 +4446,10 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 
 		if ( !$sql_limit ) return;
 		list($offset, $old_limit) = explode(',', $sql_limit);
-		$limit = isset($_REQUEST['limit']) ? (int)$_REQUEST['limit'] : trim($old_limit);
+		$limit = isset($_REQUEST['limit']) && is_scalar( $_REQUEST['limit'] ) ? absint($_REQUEST['limit']) : absint($old_limit);
 
 		$wp_query->query_vars['posts_per_page'] = $limit;
-		$wp_query->query_vars['paged'] = isset($wp_query->query['paged']) ? $wp_query->query['paged'] : 1;
+		$wp_query->query_vars['paged'] = isset($wp_query->query['paged']) ? absint($wp_query->query['paged']) : 1;
 		$offset = ($wp_query->query_vars['paged'] - 1) * $limit;
 		if ( $offset < 0 ) $offset = 0;
 
@@ -4439,8 +4488,23 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 	function set_value_count($key, $value, $id) {
 		global $wpdb;
 		
-		if ( $id ) $where = " AND `". $wpdb->postmeta."`.post_id<>".$id;
-		$query = $wpdb->prepare("SELECT COUNT(meta_id) FROM `". $wpdb->postmeta."` WHERE `". $wpdb->postmeta."`.meta_key = %s AND `". $wpdb->postmeta."`.meta_value = %s $where;", $key, $value);
+		$id = absint( $id );
+		
+		if ( $id ) :
+			$query = $wpdb->prepare(
+				"SELECT COUNT(meta_id) FROM `". $wpdb->postmeta."` WHERE `". $wpdb->postmeta."`.meta_key = %s AND `". $wpdb->postmeta."`.meta_value = %s AND `". $wpdb->postmeta."`.post_id <> %d;",
+				$key,
+				$value,
+				$id
+			);
+		else :
+			$query = $wpdb->prepare(
+				"SELECT COUNT(meta_id) FROM `". $wpdb->postmeta."` WHERE `". $wpdb->postmeta."`.meta_key = %s AND `". $wpdb->postmeta."`.meta_value = %s;",
+				$key,
+				$value
+			);
+		endif;
+		
 		$count = $wpdb->get_var($query);
 		return (int)$count;
 	}
