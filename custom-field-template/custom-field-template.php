@@ -5,7 +5,7 @@ Plugin URI: https://www.wpcft.com/
 Description: This plugin adds the default custom fields on the Write Post/Page.
 Author: Hiroaki Miyashita
 Author URI: https://wpgogo.com/
-Version: 2.8
+Version: 2.8.1
 Text Domain: custom-field-template
 Domain Path: /
 */
@@ -3384,6 +3384,18 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 		return $out;
 	}
 
+	function can_delete_cft_attachment( $attachment_id, $post_id, $meta_key ) {
+		$attachment_id = absint( $attachment_id );
+		$post_id = absint( $post_id );
+
+		if ( !$attachment_id || !$post_id || get_post_type( $attachment_id ) !== 'attachment' ) return false;
+		if ( !current_user_can( 'delete_post', $attachment_id ) ) return false;
+		if ( absint( get_post_field( 'post_parent', $attachment_id ) ) === $post_id ) return true;
+
+		$stored_values = array_map( 'absint', (array) get_post_meta( $post_id, $meta_key, false ) );
+		return in_array( $attachment_id, $stored_values, true );
+	}
+
 	function edit_meta_value( $id, $post ) {
 		global $wpdb, $wp_version, $current_user;
 		$options = $this->get_custom_field_template_data();
@@ -3540,14 +3552,14 @@ jQuery("#edButtonPreview").trigger("click"); }' . "\n";*/
 
 						if ( $data['type'] == 'file' ) :
 							if ( isset($_REQUEST[$name.'_delete'][$field_key][$data['cftnum']]) ) :
-								if ( empty($data['mediaRemove']) ) wp_delete_attachment($value);
+								if ( empty($data['mediaRemove']) && $this->can_delete_cft_attachment($value, $id, $title) ) wp_delete_attachment(absint($value));
 								delete_post_meta($id, $title, $value);
 								unset($value);
 							endif;
 							if( isset($tmpfiles[$name][$field_key][$data['cftnum']]) ) :
 								$_FILES[$title] = $tmpfiles[$name][$field_key][$data['cftnum']];
 								if ( isset($value) ) :
-									if ( empty($data['mediaRemove']) ) wp_delete_attachment($value);
+									if ( empty($data['mediaRemove']) && $this->can_delete_cft_attachment($value, $id, $title) ) wp_delete_attachment(absint($value));
 								endif;
 
 								if ( isset($data['relation']) && $data['relation'] == true ) :

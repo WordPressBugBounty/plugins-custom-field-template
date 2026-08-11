@@ -3,8 +3,8 @@ Contributors: Hiroaki Miyashita
 Donate link: https://www.wpcft.com/
 Tags: custom fields, fields, cft, template, meta
 Requires at least: 2.1
-Tested up to: 7.0
-Stable tag: 2.8
+Tested up to: 7.0.3
+Stable tag: 2.8.1
 License: GPLv2 or later
 
 The Custom Field Template plugin extends the functionality of custom fields.
@@ -117,6 +117,9 @@ See the default template and modify it.
 4. Auto Hook of `the_content()` in the option page of this plugin may help you do this. You can use [cft] shortcodes here. You can switch the cft formats in each category.
 
 == Changelog ==
+
+= 2.8.1 =
+* Bugfix: security fix.
 
 = 2.8 =
 * Bugfix: security fix.
